@@ -1,6 +1,10 @@
 # ToDoApp – CICD Challenge
 
-Fork of [Jospina1001/ToDoApp](https://github.com/Jospina1001/ToDoApp) with full CI/CD pipeline using **GitHub Actions** and **Gitflow**.
+Fork of [Jospina1001/ToDoApp](https://github.com/Jospina1001/ToDoApp) → [alejandro09pf/ToDoApp](https://github.com/alejandro09pf/ToDoApp) with full CI/CD pipeline using **GitHub Actions** and **Gitflow**.
+
+**Repos:**
+- App + CI/CD: https://github.com/alejandro09pf/ToDoApp
+- Infra (Vagrantfiles): https://github.com/alejandro09pf/todoapp-cicd
 
 ## Stack
 - **App**: Node.js 18 + Express
