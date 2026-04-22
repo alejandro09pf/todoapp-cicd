@@ -1,0 +1,11 @@
+# Used by CI to run tests with SQLite (no MySQL needed)
+version: "3.9"
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      NODE_ENV: test
+    command: yarn test --ci --forceExit --coverage

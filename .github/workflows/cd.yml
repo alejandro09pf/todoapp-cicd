@@ -1,0 +1,101 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: yarn test --ci --forceExit --coverage
+
+  build-and-push:
+    name: Build & Push to Docker Hub
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate semantic image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+          BRANCH=$(echo ${{ github.ref_name }} | sed 's/\//-/g')
+          echo "tag=${BRANCH}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/todoapp:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/todoapp:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VM
+    runs-on: self-hosted
+    needs: build-and-push
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file from secrets
+        run: |
+          cat > .env << EOF
+          DOCKER_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/todoapp
+          IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+          MYSQL_HOST=db
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DB=${{ secrets.MYSQL_DB }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          EOF
+
+      - name: Pull new image
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/todoapp:${{ needs.build-and-push.outputs.image_tag }}
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker compose down --remove-orphans
+          docker compose up -d --wait
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          curl -f http://localhost/items || exit 1
+
+      - name: Clean up old images
+        run: docker image prune -f

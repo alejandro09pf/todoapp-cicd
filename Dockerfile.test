@@ -1,0 +1,8 @@
+# Install all deps (including devDependencies) for running tests
+FROM node:18-alpine
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY src ./src
+COPY spec ./spec
+CMD ["yarn", "test", "--ci", "--forceExit", "--coverage"]

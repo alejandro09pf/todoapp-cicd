@@ -1,0 +1,68 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# This machine acts as the deploy target and GitHub Actions self-hosted runner.
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.hostname = "deploy-runner"
+
+  config.vm.network "forwarded_port", guest: 80, host: 8081
+  config.vm.network "private_network", ip: "192.168.56.20"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name   = "deploy-runner"
+    vb.memory = "2048"
+    vb.cpus   = 2
+    vb.customize ["modifyvm", :id, "--paravirtprovider", "minimal"]
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    echo "=== Updating packages ==="
+    apt-get update -qq
+
+    echo "=== Installing prerequisites ==="
+    apt-get install -y -qq ca-certificates curl gnupg lsb-release
+
+    echo "=== Installing Docker ==="
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
+                           docker-buildx-plugin docker-compose-plugin
+
+    usermod -aG docker vagrant
+    systemctl enable docker && systemctl start docker
+
+    echo "=== Installing GitHub Actions Runner ==="
+    mkdir -p /opt/actions-runner && cd /opt/actions-runner
+
+    # Download latest runner (version pinned for reproducibility)
+    RUNNER_VERSION="2.317.0"
+    curl -sLO "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+    tar xzf "actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+    rm "actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+
+    chown -R vagrant:vagrant /opt/actions-runner
+
+    echo ""
+    echo "=========================================="
+    echo "GitHub Actions Runner is downloaded."
+    echo "To register, SSH into this machine and run:"
+    echo ""
+    echo "  cd /opt/actions-runner"
+    echo "  ./config.sh --url https://github.com/<YOUR_USER>/<YOUR_REPO> \\"
+    echo "              --token <YOUR_RUNNER_TOKEN>"
+    echo "  sudo ./svc.sh install vagrant"
+    echo "  sudo ./svc.sh start"
+    echo "=========================================="
+  SHELL
+
+end
