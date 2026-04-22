@@ -28,7 +28,7 @@ Vagrant.configure("2") do |config|
     echo "=== Installing Docker ==="
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
     echo \
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
@@ -52,17 +52,18 @@ Vagrant.configure("2") do |config|
 
     chown -R vagrant:vagrant /opt/actions-runner
 
-    echo ""
-    echo "=========================================="
-    echo "GitHub Actions Runner is downloaded."
-    echo "To register, SSH into this machine and run:"
-    echo ""
-    echo "  cd /opt/actions-runner"
-    echo "  ./config.sh --url https://github.com/<YOUR_USER>/<YOUR_REPO> \\"
-    echo "              --token <YOUR_RUNNER_TOKEN>"
-    echo "  sudo ./svc.sh install vagrant"
-    echo "  sudo ./svc.sh start"
-    echo "=========================================="
+    cat <<'MSG'
+
+==========================================
+GitHub Actions Runner is downloaded.
+To register, SSH into this machine and run:
+
+  cd /opt/actions-runner
+  ./config.sh --url https://github.com/alejandro09pf/ToDoApp --token <YOUR_RUNNER_TOKEN>
+  sudo ./svc.sh install vagrant
+  sudo ./svc.sh start
+==========================================
+MSG
   SHELL
 
 end
